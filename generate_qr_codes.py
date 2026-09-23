@@ -69,10 +69,7 @@ def main():
     entries = json.loads(text)
     for entry in entries:
         url = None
-        issuer = entry.get('issuer')
-        label = entry.get('label')
-        if not issuer and " - " in label:
-            issuer, label = label.split(" - ", 1)
+        issuer, label = andotp_decrypt.issuer_and_label(entry)
         if entry['type'] == 'TOTP':
             totp = pyotp.TOTP(entry['secret'], interval=entry['period'])
             url = totp.provisioning_uri(label, issuer_name=issuer)

@@ -45,6 +45,11 @@ On debian/ubuntu this should work:
 
 - Dump JSON to the console:
   - `./andotp_decrypt.py /path/to/otp_accounts.json.aes`
+- Export for [pass](https://www.passwordstore.org/) ([pass-otp](https://github.com/tadfisher/pass-otp)) or [gopass](https://www.gopass.pw/):
+  - `./andotp_decrypt.py -f pass /path/to/otp_accounts.json.aes` prints one `NAME<TAB>otpauth://...` line per entry
+  - Names are `issuer/label` (made unique with a `_2`, `_3`, ... suffix), STEAM entries are skipped
+  - Import into pass: `./andotp_decrypt.py -f pass backup.json.aes | while IFS=$'\t' read -r name uri; do printf '%s\n' "$uri" | pass otp insert "2fa/$name"; done`
+  - Import into gopass: same loop with `gopass insert -f "2fa/$name"`; codes via `pass otp 2fa/...` / `gopass otp 2fa/...`
 - Generate new QR codes:
   - `./generate_qr_codes.py /path/to/otp_accounts.json.aes`
 - Generate a TOTP code for your google account:

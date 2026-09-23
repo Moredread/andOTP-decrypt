@@ -83,3 +83,41 @@ def test_find_limit(json_with_issuer):
 
     tag_matches = ad.find_entries(json_with_issuer, 'asmw', 2)
     assert len(tag_matches) == 2
+
+
+def test_otpauth_uri():
+    entry = {'secret': 'JBSWY3DPEHPK3PXP', 'issuer': 'ACME Inc.', 'label': 'coyote@acme',
+             'digits': 8, 'type': 'TOTP', 'algorithm': 'SHA256', 'period': 60}
+    assert ad.otpauth_uri(entry) == (
+        'otpauth://totp/ACME%20Inc.:coyote@acme?secret=JBSWY3DPEHPK3PXP'
+        '&issuer=ACME%20Inc.&algorithm=SHA256&digits=8&period=60')
+
+    hotp = dict(entry, type='HOTP', counter=5, issuer='')
+    assert ad.otpauth_uri(hotp) == (
+        'otpauth://hotp/coyote@acme?secret=JBSWY3DPEHPK3PXP&algorithm=SHA256&digits=8&counter=5')
+
+    assert ad.otpauth_uri(dict(entry, type='STEAM')) is None
+
+
+def test_otpauth_uri_legacy_label_issuer():
+    entry = {'secret': 'JBSWY3DPEHPK3PXP', 'label': 'ACME - coyote', 'type': 'TOTP'}
+    assert ad.otpauth_uri(entry).startswith('otpauth://totp/ACME:coyote?')
+    assert ad.pass_name(entry) == 'ACME/coyote'
+
+
+def test_pass_name_sanitizing():
+    assert ad.pass_name({'issuer': 'a/b', 'label': '../x\ty'}) == 'a_b/_x_y'
+    assert ad.pass_name({'issuer': '', 'label': ''}) == 'unnamed'
+
+
+def test_format_pass(json_with_issuer, capsys):
+    steam = {'type': 'STEAM', 'label': 'steam', 'secret': 'X'}
+    lines = ad.format_pass(json_with_issuer + [steam]).split('\n')
+    assert len(lines) == len(json_with_issuer)
+    names = [line.split('\t')[0] for line in lines]
+    assert names[:3] == ['asmw.org/account1', 'asmw.org/account2', 'asmw.org/account2_2']
+    assert len(set(names)) == len(names)
+    for line, entry in zip(lines, json_with_issuer):
+        assert line.split('\t')[1].startswith('otpauth://totp/')
+        assert f"secret={entry['secret']}" in line
+    assert 'unsupported OTP type STEAM' in capsys.readouterr().err

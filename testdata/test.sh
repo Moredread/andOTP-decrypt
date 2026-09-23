@@ -42,3 +42,6 @@ if echo "123456" | python3 $D/../generate_qr_codes.py $D/emptyfile.json.aes ; th
 echo "123456" | python3 $D/../andotp_decrypt.py $D/garbage.json.aes
 if echo "123456" | python3 $D/../generate_code.py $D/garbage.json.aes test ; then exit 1; fi
 if echo "123456" | python3 $D/../generate_qr_codes.py $D/garbage.json.aes ; then exit 1; fi
+
+echo 123456 | python3 $D/../andotp_decrypt.py -f pass $D/accounts_issuer_123456.json.aes > /dev/null
+if echo "123456" | python3 $D/../andotp_decrypt.py -f pass $D/emptyfile.json.aes ; then exit 1; fi

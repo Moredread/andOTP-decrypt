@@ -2,10 +2,15 @@
 """andotp-decrypt.py
 
 Usage:
-  andotp-decrypt.py [-o|--old] [--debug] [-h|--help] [--version] INPUT_FILE
+  andotp-decrypt.py [-o|--old] [--debug] [-f FORMAT] [-h|--help] [--version] INPUT_FILE
 
 Options:
   -o --old      Use old encryption (andOTP <= 0.6.2)
+  -f FORMAT --format=FORMAT
+                Output format [default: json]
+                  json: the decrypted backup as-is
+                  pass: one "NAME<TAB>otpauth://..." line per entry, for
+                        importing into pass (pass-otp) or gopass
   --debug       Print debug info
   -h --help     Show this screen.
   --version     Show version.
@@ -13,9 +18,12 @@ Options:
 """
 
 import os
+import re
 import sys
+import json
 import hashlib
 import struct
+from urllib.parse import quote, urlencode
 from getpass import getpass
 
 from Crypto.Cipher import AES
@@ -138,19 +146,94 @@ def descriptor(entry):
         return 'no label or issuer found'
 
 
+def issuer_and_label(entry):
+    issuer = entry.get('issuer')
+    label = entry.get('label')
+    # NOTE: before the issuer field existed, andOTP stored "issuer - label" in the label
+    if not issuer and label and " - " in label:
+        issuer, label = label.split(" - ", 1)
+    return issuer or '', label or ''
+
+
+def otpauth_uri(entry):
+    """Build an otpauth:// key URI (Google Authenticator key URI format) for an entry.
+
+    Returns None for types that have no otpauth representation (e.g. STEAM)."""
+    otp_type = entry['type'].lower()
+    if otp_type not in ('totp', 'hotp'):
+        return None
+    issuer, label = issuer_and_label(entry)
+    path = quote(label, safe='@')
+    if issuer:
+        path = quote(issuer, safe='@') + ':' + path
+    params = {'secret': entry['secret']}
+    if issuer:
+        params['issuer'] = issuer
+    params['algorithm'] = entry.get('algorithm', 'SHA1')
+    params['digits'] = entry.get('digits', 6)
+    if otp_type == 'totp':
+        params['period'] = entry.get('period', 30)
+    else:
+        params['counter'] = entry.get('counter', 0)
+    return f'otpauth://{otp_type}/{path}?{urlencode(params, quote_via=quote)}'
+
+
+def pass_name_component(text):
+    # '/' would create extra directory levels, control characters would break the line format
+    text = re.sub(r'[/\x00-\x1f\x7f]', '_', text).strip()
+    # pass refuses '..' path components; also avoid hidden files
+    return text.lstrip('.')
+
+
+def pass_name(entry):
+    issuer, label = issuer_and_label(entry)
+    parts = [p for p in (pass_name_component(issuer), pass_name_component(label)) if p]
+    return '/'.join(parts) or 'unnamed'
+
+
+def format_pass(entries):
+    """One "NAME<TAB>URI" line per entry, NAME being a unique pass/gopass entry name."""
+    lines = []
+    used = set()
+    for entry in entries:
+        uri = otpauth_uri(entry)
+        if uri is None:
+            print("Skipping %s: unsupported OTP type %s" % (descriptor(entry), entry['type']),
+                  file=sys.stderr)
+            continue
+        base = name = pass_name(entry)
+        counter = 1
+        while name in used:
+            counter += 1
+            name = f'{base}_{counter}'
+        used.add(name)
+        lines.append(f'{name}\t{uri}')
+    return '\n'.join(lines)
+
+
 def main():
     arguments = docopt(__doc__, version='andotp-decrypt 0.1')
     input_file = arguments['INPUT_FILE']
     debug = arguments['--debug']
     old_encryption = arguments['--old']
+    output_format = arguments['--format']
+    if output_format not in ('json', 'pass'):
+        print("Unknown output format: %s" % output_format)
+        sys.exit(1)
     if not os.path.exists(input_file):
         print("Could not find input file: %s" % input_file)
         return None
     password = get_password()
     if old_encryption:
-        print(decrypt_aes(password, input_file, debug))
+        text = decrypt_aes(password, input_file, debug)
     else:
-        print(decrypt_aes_new_format(password, input_file, debug))
+        text = decrypt_aes_new_format(password, input_file, debug)
+    if output_format == 'json':
+        print(text)
+        return
+    if not text:
+        sys.exit(1)
+    print(format_pass(json.loads(text)))
 
 
 if __name__ == '__main__':

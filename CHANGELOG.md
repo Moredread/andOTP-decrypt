@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+### Added
+- `andotp_decrypt -f pass`: export entries as `NAME<TAB>otpauth://` lines for importing into pass (pass-otp) or gopass
+
 ## 0.1.6
 ### Fixed
 - Issuer matching for code generation
