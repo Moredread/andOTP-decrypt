@@ -2,13 +2,13 @@
 """andotp-decrypt.py
 
 Usage:
-andotp-decrypt.py [-o|--old] [--debug] [-h|--help] [--version] INPUT_FILE
+  andotp-decrypt.py [-o|--old] [--debug] [-h|--help] [--version] INPUT_FILE
 
 Options:
--o --old      Use old encryption (andOTP <= 0.6.2)
---debug       Print debug info
--h --help     Show this screen.
---version     Show version.
+  -o --old      Use old encryption (andOTP <= 0.6.2)
+  --debug       Print debug info
+  -h --help     Show this screen.
+  --version     Show version.
 
 """
 

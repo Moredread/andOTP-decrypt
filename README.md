@@ -39,7 +39,7 @@ Pip install
 
 On debian/ubuntu this should work:
 
-- `sudo apt-get install python3-pycryptodome python3-pyotp python3-pyqrcode python3-pillow python3-docopt`
+- `sudo apt-get install python3-pycryptodome python3-pyotp python3-pyqrcode python3-docopt`
 
 ## Usage
 
